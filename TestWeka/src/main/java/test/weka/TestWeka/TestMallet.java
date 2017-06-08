@@ -81,20 +81,18 @@ public class TestMallet {
 
 		// System.out.println(data.get(3).stringValue(0));
 		// System.out.println(data.get(3).stringValue(1));
-		
+
 		DataSource headerBIDsource = new DataSource("resources/headers.arff");
 		Instances headerBIDdata = headerBIDsource.getDataSet();
-
 
 		int numInst = data.numInstances();
 		int numAtt = data.numAttributes();
 
 		ArrayList<Attribute> atts = new ArrayList<>();
-		
-		
+
 		atts.add(new Attribute("header", (ArrayList<String>) null));
 		atts.add(new Attribute("bodey_ID"));
-		
+
 		atts.add(new Attribute("cos_sim"));
 
 		String stances[] = new String[] { "unrelated", "related" };
@@ -105,7 +103,7 @@ public class TestMallet {
 
 		for (int i = 0; i < numInst; i++) {
 			double values[] = new double[finalInstances.numAttributes()];
-			
+
 			String title = data.get(i).stringValue(0);
 			String body = data.get(i).stringValue(1);
 			if (body.length() - title.length() >= 1000)
@@ -117,7 +115,7 @@ public class TestMallet {
 			// data.get(i).stringValue(1) + " )= " + sim);
 			values[0] = finalInstances.attribute(0).addStringValue(title);
 			values[1] = headerBIDdata.get(i).value(1);
-			
+
 			values[2] = sim;
 			values[3] = stanceValues.indexOf(data.get(i).stringValue(2));
 			// System.out.println(data.get(i).stringValue(2));
