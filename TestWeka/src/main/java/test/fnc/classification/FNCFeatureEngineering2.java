@@ -1,5 +1,8 @@
 package test.fnc.classification;
 
+import static com.google.common.base.Predicates.in;
+import static org.simmetrics.builders.StringDistanceBuilder.with;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -15,6 +18,13 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.simmetrics.StringDistance;
+import org.simmetrics.metrics.CosineSimilarity;
+import org.simmetrics.simplifiers.Simplifiers;
+import org.simmetrics.tokenizers.Tokenizers;
+
+import com.google.common.base.Predicates;
+import com.google.common.collect.Sets;
 import com.opencsv.CSVReader;
 
 import opennlp.tools.tokenize.Tokenizer;
@@ -26,7 +36,7 @@ import weka.core.DenseInstance;
 import weka.core.Instances;
 import weka.core.converters.ArffSaver;
 
-public class FNCFeatureEngineering {
+public class FNCFeatureEngineering2 {
 
 	private static TreeSet<String> stopSet;
 
@@ -34,9 +44,12 @@ public class FNCFeatureEngineering {
 
 	private static List<List<String>> stances;
 
-	static String[] refutingWords = { "fake", "fraud", "hoax", "false", "deny", "denies", "not", "despite", "nope",
-			"doubt", "doubts", "bogus", "debunk", "pranks", "retract" };
+	private static String[] refutingWords = { "fake", "fraud", "hoax", "false", "deny", "denies", "not", "despite",
+			"nope", "doubt", "doubts", "bogus", "debunk", "pranks", "retract" };
+	private static String[] discussWords = { "according", "maybe", "reporting", "reports", "say", "says", "claim",
+			"claims", "purportedly", "investigating", "told", "tells", "allegedly", "validate", "verify" };
 
+	private static StringDistance metric;
 	private static Instances instances;
 
 	public static void setData() throws IOException {
@@ -61,6 +74,13 @@ public class FNCFeatureEngineering {
 		}
 	}
 
+	private static void setDistanceMetric() {
+		Set<String> commonWords = Sets.newHashSet(stopSet);
+		metric = with(new CosineSimilarity<String>()).simplify(Simplifiers.toLowerCase())
+				.simplify(Simplifiers.removeNonWord()).tokenize(Tokenizers.whitespace())
+				.filter(Predicates.not(in(commonWords))).tokenize(Tokenizers.qGram(3)).build();
+	}
+
 	private static Instances getWekaInstances() {
 		ArrayList<Attribute> attributes = new ArrayList<>();
 		attributes.add(new Attribute("word_overlap"));
@@ -68,6 +88,11 @@ public class FNCFeatureEngineering {
 		for (String refute : refutingWords) {
 			attributes.add(new Attribute("refute_" + refute));
 		}
+
+		for (String refute : discussWords) {
+			attributes.add(new Attribute("discuss_" + refute));
+		}
+
 		attributes.add(new Attribute("pol_head"));
 		attributes.add(new Attribute("pol_body"));
 
@@ -76,12 +101,14 @@ public class FNCFeatureEngineering {
 			attributes.add(new Attribute("cgram_hits_" + size));
 			attributes.add(new Attribute("cgram_early_hits_" + size));
 			attributes.add(new Attribute("cgram_first_hits_" + size));
+			attributes.add(new Attribute("cgram_tail_hits_" + size));
 		}
 
 		int[] ngramSizes = { 2, 3, 4, 5, 6 };
 		for (int size : ngramSizes) {
 			attributes.add(new Attribute("ngram_hits_" + size));
 			attributes.add(new Attribute("ngram_early_hits_" + size));
+			attributes.add(new Attribute("ngram_tail_hits" + size));
 		}
 
 		attributes.add(new Attribute("bin_co_occ_count"));
@@ -90,10 +117,11 @@ public class FNCFeatureEngineering {
 		attributes.add(new Attribute("bin_co_occ_stop_count"));
 		attributes.add(new Attribute("bin_co_occ_stop_early"));
 
-		String stancesClasses[] = new String[] { "agree", "disagree", "discuss", "unrelated"};
+		attributes.add(new Attribute("similarity"));
+
+		String stancesClasses[] = new String[] { "agree", "disagree", "discuss", "unrelated" };
 		List<String> stanceValues = Arrays.asList(stancesClasses);
 		attributes.add(new Attribute("class", stanceValues));
-
 
 		instances = new Instances("fnc", attributes, 1000);
 		for (int i = 0; i < stances.size(); i++) {
@@ -105,10 +133,12 @@ public class FNCFeatureEngineering {
 
 			features.add(getWordOverlapFeature(headline, body));
 			features.addAll(getRefutingFeature(headline, body));
+			features.addAll(getDiscussFeature(headline, body));
 			features.addAll(getPolarityFeatures(headline, body));
 			features.addAll(countGrams(headline, body));
 			features.addAll(binaryCoOccurenceFeatures(headline, body));
 			features.addAll(binaryCoOccurenceStopFeatures(headline, body));
+			features.add(getSimilarityFeature(headline, body));
 			features.add((double) stanceValues.indexOf(stances.get(i).get(2)));
 
 			double[] a = new double[features.size()];
@@ -116,9 +146,6 @@ public class FNCFeatureEngineering {
 			for (double feature : features) {
 				a[j++] = feature;
 			}
-
-			// a[features.size() - 1] =
-			// stanceValues.indexOf(stances.get(i).get(2));
 
 			instances.add(new DenseInstance(1.0, a));
 		}
@@ -272,6 +299,22 @@ public class FNCFeatureEngineering {
 		return f;
 	}
 
+	public static List<Double> getDiscussFeature(String headLine, String body) {
+
+		String cleanHeadline = cleanText(headLine);
+		List<String> headLineLem = lemmatize(cleanHeadline);
+
+		List<Double> f = new ArrayList<>();
+
+		for (String discussWord : discussWords) {
+			if (headLineLem.contains(discussWord))
+				f.add(1.0); // TODO maychange this to add integers
+			else
+				f.add(0.0);
+		}
+		return f;
+	}
+
 	public static List<String> getNGrams(String text, int n) {
 		List<String> ret = new ArrayList<String>();
 		String[] input = text.split(" ");
@@ -320,6 +363,7 @@ public class FNCFeatureEngineering {
 		int gramHits = 0;
 		int gramEarlyHits = 0;
 		int gramFirstHits = 0;
+		int gramTailHits = 0;
 
 		for (String gram : grams) {
 			if (body.contains(gram)) {
@@ -329,9 +373,18 @@ public class FNCFeatureEngineering {
 				if (body.substring(0, 255).contains(gram)) {
 					gramEarlyHits++;
 				}
+
+				if (body.substring(body.length() - 255).contains(gram)) {
+					gramTailHits++;
+				}
+
 			} else {
 				if (body.contains(gram)) {
 					gramEarlyHits++;
+				}
+
+				if (body.contains(gram)) {
+					gramTailHits++;
 				}
 			}
 
@@ -339,9 +392,16 @@ public class FNCFeatureEngineering {
 				if (body.substring(0, 100).contains(gram)) {
 					gramFirstHits++;
 				}
+
+				if (body.substring(body.length() - 100).contains(gram)) {
+					gramTailHits++;
+				}
 			} else {
 				if (body.contains(gram)) {
 					gramFirstHits++;
+				}
+				if (body.contains(gram)) {
+					gramTailHits++;
 				}
 			}
 		}
@@ -350,6 +410,7 @@ public class FNCFeatureEngineering {
 		f.add((double) gramHits);
 		f.add((double) gramEarlyHits);
 		f.add((double) gramFirstHits);
+		f.add((double) gramTailHits);
 
 		return f;
 	}
@@ -360,6 +421,7 @@ public class FNCFeatureEngineering {
 
 		int gramHits = 0;
 		int gramEarlyHits = 0;
+		int gramTailHits = 0;
 
 		for (String gram : grams) {
 			if (body.contains(gram)) {
@@ -369,9 +431,18 @@ public class FNCFeatureEngineering {
 				if (body.substring(0, 255).contains(gram)) {
 					gramEarlyHits++;
 				}
+
+				if (body.substring(body.length() - 255).contains(gram)) {
+					gramTailHits++;
+				}
+
 			} else {
 				if (body.contains(gram)) {
 					gramEarlyHits++;
+				}
+				if (body.contains(gram)) { // TODO do weneed to look in this
+											// case
+					gramTailHits++;
 				}
 			}
 
@@ -380,6 +451,7 @@ public class FNCFeatureEngineering {
 		List<Double> f = new ArrayList<>();
 		f.add((double) gramHits);
 		f.add((double) gramEarlyHits);
+		f.add((double) gramTailHits);
 
 		return f;
 
@@ -458,12 +530,17 @@ public class FNCFeatureEngineering {
 		return f;
 	}
 
+	public static Double getSimilarityFeature(String headLine, String body) {
+		return (double) (1 - metric.distance(headLine, body));
+	}
+
 	public static void FNCFeaturesToARFF(String filePath) {
 		// get the data also first
 	}
 
 	public static void main(String[] args) throws Exception {
 		initializeStopwords("resources/stopwords.txt");
+		setDistanceMetric();
 
 		// String text = new FNCFeatureEngineering().cleanText("Our Retina
 		// MacBook Air rumour article brings"
@@ -491,7 +568,7 @@ public class FNCFeatureEngineering {
 
 		setData();
 		getWekaInstances();
-		saveInstancesToARFFFile("resources/baseline_features_complete.arff");
+		saveInstancesToARFFFile("resources/baseline_features_add.arff");
 
 	}
 
