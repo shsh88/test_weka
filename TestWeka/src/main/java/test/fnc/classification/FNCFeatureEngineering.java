@@ -2,7 +2,6 @@ package test.fnc.classification;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,8 +14,6 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.TreeSet;
 
-import com.opencsv.CSVReader;
-
 import opennlp.tools.tokenize.Tokenizer;
 import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
@@ -24,7 +21,6 @@ import opennlp.tools.util.InvalidFormatException;
 import weka.core.Attribute;
 import weka.core.DenseInstance;
 import weka.core.Instances;
-import weka.core.converters.ArffSaver;
 
 public class FNCFeatureEngineering {
 
@@ -32,33 +28,18 @@ public class FNCFeatureEngineering {
 
 	private static HashMap<Integer, String> idBodyMap;
 
-	private static List<List<String>> stances;
+	static List<List<String>> stances;
 
 	static String[] refutingWords = { "fake", "fraud", "hoax", "false", "deny", "denies", "not", "despite", "nope",
 			"doubt", "doubts", "bogus", "debunk", "pranks", "retract" };
 
-	private static Instances instances;
+	static Instances instances;
 
-	public static void setData() throws IOException {
-		File bodiesFile = new File("resources/train_bodies.csv");
+	public static void setData(String bodiesFilePath, String stancesFilePath) throws IOException {
 
-		idBodyMap = getBodiesMap(bodiesFile);
+		idBodyMap = FNCUtility.getBodiesMap(bodiesFilePath);
 
-		readStances();
-	}
-
-	private static void readStances() throws FileNotFoundException, IOException {
-		CSVReader stancesReader = new CSVReader(new FileReader("resources/train_stances.csv"));
-		String[] stancesline;
-		stances = new ArrayList<>();
-		stancesReader.readNext();
-		while ((stancesline = stancesReader.readNext()) != null) {
-			List<String> record = new ArrayList<>();
-			record.add(stancesline[0]);
-			record.add(stancesline[1]);
-			record.add(stancesline[2]);
-			stances.add(record);
-		}
+		stances = FNCUtility.readStances(stancesFilePath);
 	}
 
 	private static Instances getWekaInstances() {
@@ -90,10 +71,9 @@ public class FNCFeatureEngineering {
 		attributes.add(new Attribute("bin_co_occ_stop_count"));
 		attributes.add(new Attribute("bin_co_occ_stop_early"));
 
-		String stancesClasses[] = new String[] { "agree", "disagree", "discuss", "unrelated"};
+		String stancesClasses[] = new String[] { "agree", "disagree", "discuss", "unrelated" };
 		List<String> stanceValues = Arrays.asList(stancesClasses);
 		attributes.add(new Attribute("class", stanceValues));
-
 
 		instances = new Instances("fnc", attributes, 1000);
 		for (int i = 0; i < stances.size(); i++) {
@@ -124,31 +104,6 @@ public class FNCFeatureEngineering {
 		}
 
 		return instances;
-	}
-
-	private static void saveInstancesToARFFFile(String filepath) throws IOException {
-		ArffSaver saver = new ArffSaver();
-		saver.setInstances(instances);
-		saver.setFile(new java.io.File(filepath));
-		saver.writeBatch();
-	}
-
-	private static HashMap<Integer, String> getBodiesMap(File bodiesFile) {
-		HashMap<Integer, String> bodyMap = new HashMap<>(100, 100);
-		CSVReader reader = null;
-		try {
-			reader = new CSVReader(new FileReader(bodiesFile));
-			String[] line;
-			line = reader.readNext();
-			while ((line = reader.readNext()) != null) {
-				bodyMap.put(Integer.valueOf(line[0]), line[1]);
-			}
-			reader.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		return bodyMap;
 	}
 
 	public static String cleanText(String text) {
@@ -475,8 +430,8 @@ public class FNCFeatureEngineering {
 		// + "MacBook Air in a new size: one based on a 12in screen.");
 
 		/*
-		 * String text = new FNCFeatureEngineering()
-		 * .cleanText("\"Let's get this vis-a-vis\", he said, \"these boys' marks are really that well?\""
+		 * String text = new FNCFeatureEngineering() .cleanText(
+		 * "\"Let's get this vis-a-vis\", he said, \"these boys' marks are really that well?\""
 		 * );
 		 * 
 		 * System.out.println(text);
@@ -489,9 +444,9 @@ public class FNCFeatureEngineering {
 		// System.out.println(removeStopWords(new
 		// FNCFeatureEngineering().lemmatize(text)));
 
-		setData();
+		setData("resources/train_bodies.csv", "resources/train_stances.csv");
 		getWekaInstances();
-		saveInstancesToARFFFile("resources/baseline_features_complete.arff");
+		FNCUtility.saveInstancesToARFFFile("resources/baseline_features_complete.arff", instances);
 
 	}
 

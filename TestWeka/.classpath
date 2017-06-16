@@ -18,6 +18,6 @@
 			<attribute name="maven.pomderived" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="/home/razan/Downloads/jboss-javassist-javassist-dfd0733/javassist.jar"/>
+	<classpathentry kind="lib" path="C:/Master UDE/thesis/New folder/jboss-javassist-javassist-dfd0733/javassist.jar"/>
 	<classpathentry kind="output" path="target/classes"/>
 </classpath>
