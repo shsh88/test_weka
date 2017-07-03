@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,26 +36,29 @@ public class CSV2ARFFBoW {
 		stances = FNCUtility.readStances(stancesFilePath);
 
 		ArrayList<Attribute> attributes = new ArrayList<>();
-		attributes.add(new Attribute("Title", (ArrayList<String>) null));
-		attributes.add(new Attribute("Body", (ArrayList<String>) null));
 
 		List<String> stanceValues = Arrays.asList(stancesClasses);
 		attributes.add(new Attribute("class", stanceValues));
 
+		attributes.add(new Attribute("Title", (ArrayList<String>) null));
+		attributes.add(new Attribute("Body", (ArrayList<String>) null));
+
 		// System.out.println(attributes.size());
 		Instances instances = new Instances("fnc", attributes, 1000);
 		for (int i = 0; i < stances.size(); i++) {
-			
+
 			if ((i + 1) % 1000 == 0)
 				System.out.println("Processing after i " + i);
 
 			List<Integer> features = new ArrayList<>();
 
-			String headline = getLemmatizedInput(stances.get(i).get(0));
-			features.add(instances.attribute(0).addStringValue(headline));
-			String body = getLemmatizedInput(bodiesMap.get(Integer.valueOf(stances.get(i).get(1))));
-			features.add(instances.attribute(1).addStringValue(body));
+			// class attribute
 			features.add(stanceValues.indexOf(stances.get(i).get(2)));
+
+			String headline = getLemmatizedInput(stances.get(i).get(0));
+			features.add(instances.attribute(1).addStringValue(headline));
+			String body = getLemmatizedInput(bodiesMap.get(Integer.valueOf(stances.get(i).get(1))));
+			features.add(instances.attribute(2).addStringValue(body));
 
 			double[] a = new double[features.size()];
 			int j = 0;
@@ -92,7 +96,7 @@ public class CSV2ARFFBoW {
 			// Set the filter
 			StringToWordVector filter = new StringToWordVector();
 			filter.setTokenizer(wTokinizer);
-			filter.setAttributeIndicesArray(new int[] { 0, 1 });
+			filter.setAttributeIndicesArray(new int[] { 1, 2 });
 			filter.setInputFormat(inputInstances);
 			// filter.setWordsToKeep(1000);
 			filter.setDoNotOperateOnPerClassBasis(true);
@@ -103,6 +107,8 @@ public class CSV2ARFFBoW {
 
 			// Filter the input instances into the output ones
 			outputInstances = Filter.useFilter(inputInstances, filter);
+
+			weka.core.SerializationHelper.write("resources/blah", filter);
 
 			System.out.println("===== Filtering dataset done =====");
 		} catch (Exception e) {
@@ -143,13 +149,41 @@ public class CSV2ARFFBoW {
 
 	public static void main(String[] args) throws Exception {
 
-		instances = getInstances("resources/train_stances.csv", "resources/train_bodies.csv");
-		FNCUtility.saveInstancesToARFFFile("resources/title_body_stance.arff", instances);
+		// instances = getInstances("resources/train_stances.csv",
+		// "resources/train_bodies.csv");
+		// FNCUtility.saveInstancesToARFFFile("resources/title_body_stance.arff",
+		// instances);
 
-		inputInstances = FNCUtility.loadARFF("resources/title_body_stance.arff");
+		// inputInstances =
+		// FNCUtility.loadARFF("resources/title_body_stance.arff", 0);
 
-		index();
-		saveARFF("resources/BoW_title_body_stance_lemma.arff");
+		// index();
+		// saveARFF("resources/BoW_title_body_stance_lemma.arff");
+
+		Instances bowInstances = FNCUtility.loadARFF("resources/BoW_title_body_stance_lemma.arff", 0);
+		Enumeration<Attribute> atts = bowInstances.get(3).enumerateAttributes();
+		System.out.println(bowInstances.get(3).value(2));
+
+		for (int i = 1; i < bowInstances.get(3).numAttributes(); i++) {
+			if (bowInstances.get(3).value(i) > 0.0)
+				System.out.println(bowInstances.get(3).value(i) + bowInstances.get(3).attribute(i).name());
+		}
+
+		/*
+		 * while(atts.hasMoreElements()){ Attribute att = atts.nextElement();
+		 * //if(att.numValues()>0) System.out.println(att.name() +" "+
+		 * att.value(1)); }
+		 */
+
+		System.out.println();
+
+		// StringToWordVector filter = (StringToWordVector)
+		// weka.core.SerializationHelper.read("resources/blah");
+		// filter.ou
+		// Instances FilteredTestInstances = Filter.useFilter(bowInstances,
+		// filter);
+		// System.out.println(FilteredTestInstances.get(0));
+
 		/*
 		 * String txt =
 		 * "How could you be seeing into my eyes like open doors? \n"+

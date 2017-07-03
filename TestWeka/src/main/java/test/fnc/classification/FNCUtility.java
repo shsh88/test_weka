@@ -17,7 +17,21 @@ import weka.core.converters.ArffLoader.ArffReader;
 
 public class FNCUtility {
 
-	static List<List<String>> readStances(String filePath) throws FileNotFoundException, IOException {
+	public static List<List<String>> readStances(String filePath) throws FileNotFoundException, IOException {
+		CSVReader stancesReader = new CSVReader(new FileReader(filePath));
+		String[] stancesline;
+		List<List<String>> stances = new ArrayList<>();
+		stancesReader.readNext();
+		while ((stancesline = stancesReader.readNext()) != null) {
+			List<String> record = new ArrayList<>();
+			for (int i = 0; i < stancesline.length; i++)
+				record.add(stancesline[i]);
+			stances.add(record);
+		}
+		return stances;
+	}
+
+	public static List<List<String>> readTestStances(String filePath) throws FileNotFoundException, IOException {
 		CSVReader stancesReader = new CSVReader(new FileReader(filePath));
 		String[] stancesline;
 		List<List<String>> stances = new ArrayList<>();
@@ -26,13 +40,13 @@ public class FNCUtility {
 			List<String> record = new ArrayList<>();
 			record.add(stancesline[0]);
 			record.add(stancesline[1]);
-			record.add(stancesline[2]);
 			stances.add(record);
 		}
+		stancesReader.close();
 		return stances;
 	}
 
-	static HashMap<Integer, String> getBodiesMap(String bodiesFilePath) {
+	public static HashMap<Integer, String> getBodiesMap(String bodiesFilePath) {
 		HashMap<Integer, String> bodyMap = new HashMap<>(100, 100);
 		CSVReader reader = null;
 		try {
@@ -46,26 +60,27 @@ public class FNCUtility {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	
+
 		return bodyMap;
 	}
 
-	
 	/**
 	 * Loads an ARFF file into an instances object.
-	 * @param fileName The name of the file to be loaded.
+	 * 
+	 * @param fileName
+	 *            The name of the file to be loaded.
+	 * @param classIndex
 	 */
-	public static Instances loadARFF(String fileName) {
+	public static Instances loadARFF(String fileName, int classIndex) {
 		Instances inputInstances = null;
 		try {
 			BufferedReader reader = new BufferedReader(new FileReader(fileName));
 			ArffReader arff = new ArffReader(reader);
 			inputInstances = arff.getData();
-			inputInstances.setClassIndex(0);
+			inputInstances.setClassIndex(classIndex);
 			System.out.println("===== Loaded dataset: " + fileName + " =====");
 			reader.close();
-		}
-		catch (IOException e) {
+		} catch (IOException e) {
 			System.out.println("Problem found when reading: " + fileName);
 		}
 		return inputInstances;
@@ -78,7 +93,5 @@ public class FNCUtility {
 		saver.setFile(new java.io.File(filepath));
 		saver.writeBatch();
 	}
-	
-	
 
 }
